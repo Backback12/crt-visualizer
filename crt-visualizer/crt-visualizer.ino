@@ -181,7 +181,10 @@ void loop() {
 
 
   // visualize
+  
   videoOut.waitForFrame();  // wait incase this is too fast
+
+
   videoOut.fillScreen(0);
   videoOut.setCursor(16, 16);
   videoOut.setTextSize(1);
@@ -189,16 +192,22 @@ void loop() {
 
   for (int i = 1; i < samples / 2; i++) {
     // int magnitude = (int)vReal[i];
+    // draw last height
+    int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
+    videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     240 - height, height, 0x80);
+    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 240 - height, height, 0x80);
+    
+
     int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.65));
 
     smooth[i] = magnitude;
 
     // scale height (240)
-    int height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+    height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
 
     // videoOut.drawFastVLine(i, 240-height, height, 0xFF);
 
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     240 - height, height, 0xFF);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 240 - height, height, 0xFF);
+    videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     240 - height, height, 0x03);
+    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 240 - height, height, 0x03);
   }
 }
