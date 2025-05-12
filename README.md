@@ -4,8 +4,10 @@ Visualize audio input through composite video output
 Built using ESP32 (LOLIN D32)
 
 
-ESP_8_BIT_composite
+## Libraries
+### ESP_8_BIT_composite
 https://github.com/Roger-random/ESP_8_BIT_composite/
-arduinoFFT
+
+### arduinoFFT
 https://github.com/kosme/arduinoFFT/wiki
 
