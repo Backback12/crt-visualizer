@@ -54,7 +54,7 @@ Composite video resolution: 255x240
 
 #include <arduinoFFT.h>
 
-#include "settings.h"
+#include "setting.h"
 #include <Button2.h>
 
 
@@ -79,6 +79,15 @@ ArduinoFFT<double> FFT = ArduinoFFT<double>(vReal, vImag, samples, samplingFreq)
 unsigned long lastSampleTime = 0;
 unsigned int samplingPeriodUs = 1000000 / samplingFreq; // micro s
 
+
+
+Button2 button;
+
+// Create an instance of the graphics library
+ESP_8_BIT_GFX videoOut(true /* = NTSC */, 8 /* = RGB332 color */);
+
+
+
 unsigned long lastAnimationTime = 0;
 byte animX = 0;
 byte animY = 0;
@@ -87,13 +96,28 @@ unsigned long settingAnimTimer = 0; // if > millis() show anim. If < millis(), h
 bool settingActive;
 int settingLockVal;  // locked value, move += 5% to show setting
 int potValue;
-
 byte colour = 0x03;
 
-Button2 button;
+// settings!
+const int NUM_SETTINGS = 2;
+Setting settings[NUM_SETTINGS] = {
+  Setting("Hue", 4096),
+  Setting("Log Exponent", 10),
+};
+int activeSetting = 0;
 
-// Create an instance of the graphics library
-ESP_8_BIT_GFX videoOut(true /* = NTSC */, 8 /* = RGB332 color */);
+
+void settingClickHandler(Button2& btn) {
+  settings[activeSetting].deactivate();
+  activeSetting = (activeSetting + 1) % NUM_SETTINGS;
+  settings[activeSetting].activate();
+  
+  // set animation
+  settingActive = true;
+  settingAnimTimer = millis() + 3000;
+}
+
+
 
 void setup() {
   // Initial setup of graphics library
@@ -118,11 +142,16 @@ void setup() {
 
   // setup button
   button.begin(BUTT_PIN);
-  //button.setClickHandler();
+  button.setClickHandler(settingClickHandler);
   //button.setDoubleClickHandler();
   //button.setLongClickHandler(); or button.setLongClickDetectedHandler();
   //button.setLongClickTime(ms)
   //button.setDoubleClickTime(ms)
+
+
+  // s_hue.activate();
+  // s_exp.activate();
+  settings[activeSetting].activate();
 }
 
 
@@ -160,56 +189,145 @@ void loop() {
   }
   // videoOut.setCursor(16, 16);
   videoOut.setCursor(animX, animY);
+  videoOut.setTextColor(colour);
   videoOut.setTextSize(1);
   videoOut.print("audio_signal");
 
   int lastX = 16 - 2;
   int lastY = 240;
-  for (int i = 1; i < samples / 2; i++) {
+
+  if (false) { // linear FFT mapping
+    for (int i = 1; i < samples / 2; i++) {
+      // =============================================
+      // COLOURED BARS FROM BOTTOM
+      // =============================================
+      /*
+      // draw last height
+      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, 0x80);
+      
+
+      int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
+
+      smooth[i] = magnitude;
+
+      // scale height (240)
+      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+
+      // videoOut.drawFastVLine(i, 240-height, height, 0xFF);
+
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, colour);
+      */
+
+      //=============================================
+      // COLOURED BARS FROM CENTER (~120?)
+      //=============================================
+      /*
+      // draw last height
+      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, 0x80);
+
+      // smooth decay effect
+      // int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
+      // OR
+      // smooth both - prioritizes fast spikes, otherwise smooth descent
+      int magnitude = max((int) vReal[i] * 0.4 + (int) smooth[i] * 0.6, 
+                          (int) vReal[i] * 0.2 + (int) smooth[i] * 0.8);
+      smooth[i] = magnitude;
+
+
+      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, colour);
+      */
+      // =============================================
+      // WHITE CONTINUOUS LINE
+      // =============================================
+      /*
+      int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
+      smooth[i] = magnitude;
+      int height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+
+      videoOut.drawLine(lastX, lastY, i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, 0x18);
+      lastX = i * ((int) 256 / samples * 2) + 2 + 16;
+      lastY = 240 - height;
+      */
+    }
+  } // linear FFT mapping
+
+  if (true) { // logarithmic FFT mapping
+    //=============================================
+    // COLOURED BARS FROM CENTER (~120?) *** LOGARITHMIC FREQUENCY!!!!
+    //=============================================
+    const int numBins = 64;
+    float logBins[numBins];
+
+    const float exponent = 2.3; // estimated 2.0-3.5?
     
-    // BLUE AND RED BARS
-    ///*
-    // draw last height
-    int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, 0x80);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, 0x80);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, 0x80);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, 0x80);
     
+    for (int i = 0; i < numBins; i++) {
+      float startF = pow(i / (float)numBins, exponent) * samples / 2;
+      float endF   = pow((i + 1) / (float)numBins, exponent) * samples / 2;
 
-    int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
+      int startIdx = constrain((int)startF, 1, (samples / 2) - 1);
+      int endIdx   = constrain((int)endF, startIdx + 1, (samples / 2));
 
-    smooth[i] = magnitude;
+      float sum = 0;
+      int count = 0;
 
-    // scale height (240)
-    height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+      for (int j = startIdx; j < endIdx; j++) {
+        sum += vReal[j];  // magnitude from FFT
+        count++;
+      }
 
-    // videoOut.drawFastVLine(i, 240-height, height, 0xFF);
+      logBins[i] = (count > 0) ? (sum / count) : 0;
 
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, colour);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, colour);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, colour);
-    videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, colour);
-    //*/
 
-    // WHITE CONTINUOUS LINE
-    /*
-    int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
-    smooth[i] = magnitude;
-    int height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+      // draw last height
+      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, 0x80);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, 0x80);
 
-    videoOut.drawLine(lastX, lastY, i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, 0x18);
-    lastX = i * ((int) 256 / samples * 2) + 2 + 16;
-    lastY = 240 - height;
-    */
-  }
+      // smooth decay effect
+      // int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
+      // OR
+      // smooth both - prioritizes fast spikes, otherwise smooth descent
+      int magnitude = max((int) logBins[i] * 0.4 + (int) smooth[i] * 0.6, 
+                          (int) logBins[i] * 0.2 + (int) smooth[i] * 0.8);
+      smooth[i] = magnitude;
 
+
+      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, colour);
+      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, colour);
+    }
+  } // logarithmic FFT mapping
 
 
   // handle settings and stuff
   potValue = potValue * 0.6 + analogRead(POT_PIN) * 0.4;
+  // s_exp.setValueFromPot(potValue);
+  settings[activeSetting].setValueFromPot(potValue);
+
   
-  colour = hsvToRGB332(255 * potValue / 4095, 255, 255);
+  // colour = hsvToRGB332(255 * potValue / 4095, 255, 255);
+  // colour = hsvToRGB332(255 * s_exp.getRawValue() / 4095, 255, 255);
+  colour = hsvToRGB332(255 * settings[activeSetting].getRawValue() / 4095, 255, 255);
   
   if (abs(potValue - settingLockVal) > 205) { // changed by >5% (5% of 4096 is 204.8)
     settingAnimTimer = millis() + 3000; // 3 seconds hold
@@ -229,9 +347,13 @@ void loop() {
     videoOut.setCursor(32, 167);
     videoOut.setTextColor(0x1C);
     videoOut.setTextSize(1);
-    videoOut.print("Hue");
+    // videoOut.print("Hue");
+    // videoOut.print(s_exp.getName());
+    videoOut.print(settings[activeSetting].getName());
     // videoOut.print((int) 50 * potValue / 4095); //RGB332
-    videoOut.fillRect(32, 176, 191 * potValue / 4095, 16, 0b00011000);
+    // videoOut.fillRect(32, 176, 191 * potValue / 4095, 16, 0b00011000);
+    // videoOut.fillRect(32, 176, 191 * s_exp.getRawValue() / 4095, 16, 0b00011000);
+    videoOut.fillRect(32, 176, 191 * settings[activeSetting].getRawValue() / 4095, 16, 0b00011000);
     videoOut.drawRect(32, 176, 191, 16, 0x1C);  
   }
 }
