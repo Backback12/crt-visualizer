@@ -56,11 +56,13 @@ Composite video resolution: 255x240
 
 #include "setting.h"
 #include <Button2.h>
+#include "CRTEffects.h"
 
 
 
 #define POT_PIN 33
-#define AUDIO_PIN 34
+// #define AUDIO_PIN 34
+#define AUDIO_PIN 35
 #define BUTT_PIN 32
 //#define VIDEO_PIN 25  // pre-defined in lib
 
@@ -119,6 +121,11 @@ void settingClickHandler(Button2& btn) {
 
 
 
+CRTEffects effects(&videoOut, samples);
+int currentEffect = 0;
+
+
+
 void setup() {
   // Initial setup of graphics library
   videoOut.begin();
@@ -152,6 +159,8 @@ void setup() {
   // s_hue.activate();
   // s_exp.activate();
   settings[activeSetting].activate();
+
+  Serial.begin(115200);
 }
 
 
@@ -164,8 +173,8 @@ void loop() {
     unsigned long now = micros();
     while (micros() - now < samplingPeriodUs);  // wait for sample interval
 
-    int audioSignal = analogRead(AUDIO_PIN);
-    vReal[i] = (double)(audioSignal - 1830);  // seems to center around 1830..... find some way to normalize it?
+    // int audioSignal = analogRead(AUDIO_PIN);
+    vReal[i] = (double)(analogRead(AUDIO_PIN) - 1830);  // seems to center around 1830..... find some way to normalize it?
     vImag[i] = 0;
   }
 
@@ -178,9 +187,9 @@ void loop() {
 
   // visualize
   videoOut.waitForFrame();  // wait for next composite frame
-
-
   videoOut.fillScreen(0);
+
+  /*
   if (millis() > lastAnimationTime + 10000) {
     // every 10 seconds, update position (prevents burn in?)
     lastAnimationTime = millis();
@@ -195,128 +204,32 @@ void loop() {
 
   int lastX = 16 - 2;
   int lastY = 240;
+  */
+  
+  // int currentEffect;
+  if (millis() > lastAnimationTime + 10000) {
+    lastAnimationTime = millis();
+    // currentEffect = (currentEffect + 1) % 6;
+    currentEffect++;
 
-  if (false) { // linear FFT mapping
-    for (int i = 1; i < samples / 2; i++) {
-      // =============================================
-      // COLOURED BARS FROM BOTTOM
-      // =============================================
-      /*
-      // draw last height
-      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, 0x80);
-      
+    Serial.print("Current effect: #");
+    Serial.println(currentEffect);
+  }
+  effects.updateData(vReal, colour);
 
-      int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
-
-      smooth[i] = magnitude;
-
-      // scale height (240)
-      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
-
-      // videoOut.drawFastVLine(i, 240-height, height, 0xFF);
-
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 16,     240 - height, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1 + 16, 240 - height, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3 + 16, 240 - height, height, colour);
-      */
-
-      //=============================================
-      // COLOURED BARS FROM CENTER (~120?)
-      //=============================================
-      /*
-      // draw last height
-      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, 0x80);
-
-      // smooth decay effect
-      // int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
-      // OR
-      // smooth both - prioritizes fast spikes, otherwise smooth descent
-      int magnitude = max((int) vReal[i] * 0.4 + (int) smooth[i] * 0.6, 
-                          (int) vReal[i] * 0.2 + (int) smooth[i] * 0.8);
-      smooth[i] = magnitude;
-
-
-      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, colour);
-      */
-      // =============================================
-      // WHITE CONTINUOUS LINE
-      // =============================================
-      /*
-      int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
-      smooth[i] = magnitude;
-      int height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
-
-      videoOut.drawLine(lastX, lastY, i * ((int) 256 / samples * 2) + 2 + 16, 240 - height, 0x18);
-      lastX = i * ((int) 256 / samples * 2) + 2 + 16;
-      lastY = 240 - height;
-      */
-    }
-  } // linear FFT mapping
-
-  if (true) { // logarithmic FFT mapping
-    //=============================================
-    // COLOURED BARS FROM CENTER (~120?) *** LOGARITHMIC FREQUENCY!!!!
-    //=============================================
-    const int numBins = 64;
-    float logBins[numBins];
-
-    const float exponent = 2.3; // estimated 2.0-3.5?
-    
-    
-    for (int i = 0; i < numBins; i++) {
-      float startF = pow(i / (float)numBins, exponent) * samples / 2;
-      float endF   = pow((i + 1) / (float)numBins, exponent) * samples / 2;
-
-      int startIdx = constrain((int)startF, 1, (samples / 2) - 1);
-      int endIdx   = constrain((int)endF, startIdx + 1, (samples / 2));
-
-      float sum = 0;
-      int count = 0;
-
-      for (int j = startIdx; j < endIdx; j++) {
-        sum += vReal[j];  // magnitude from FFT
-        count++;
-      }
-
-      logBins[i] = (count > 0) ? (sum / count) : 0;
-
-
-      // draw last height
-      int height = constrain(map(smooth[i], 0, 5000, 0, 200), 0, 200);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, 0x80);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, 0x80);
-
-      // smooth decay effect
-      // int magnitude = max((int) vReal[i], (int) (smooth[i] * 0.80));
-      // OR
-      // smooth both - prioritizes fast spikes, otherwise smooth descent
-      int magnitude = max((int) logBins[i] * 0.4 + (int) smooth[i] * 0.6, 
-                          (int) logBins[i] * 0.2 + (int) smooth[i] * 0.8);
-      smooth[i] = magnitude;
-
-
-      height = constrain(map(magnitude, 0, 5000, 0, 200), 0, 200);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2),     120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 1, 120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 2, 120 - height / 2, height, colour);
-      videoOut.drawFastVLine(i * ((int) 256 / samples * 2) + 3, 120 - height / 2, height, colour);
-    }
-  } // logarithmic FFT mapping
+  switch(currentEffect) {
+    case 0: effects.colouredBarsBottom(); break;
+    case 1: effects.colouredBarsCenter(); break;
+    case 2: effects.whiteLineTick(); break;
+    case 3: effects.logColouredBarsTick(2.5); break;
+    case 4: effects.pulsingOrbs(); break;
+    case 5: effects.nebulaTunnel(); break;
+    case 6: effects.sonicRings(); break;
+    case 7: effects.oceanWave(); break;
+    case 8: effects.bassTongue(); break;
+    case 9: effects.radarScan(); break;
+    default: currentEffect = 0;
+  }
 
 
   // handle settings and stuff
